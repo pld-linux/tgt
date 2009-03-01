@@ -37,7 +37,7 @@ start() {
 	fi
 
 	msg_starting "iSCSI TGT"
-	daemon /usr/sbin/tgt
+	daemon /usr/sbin/tgtd
 	RETVAL=$?
 	[ $RETVAL -ne 0 ] && return $RETVAL
 
@@ -167,7 +167,7 @@ case "$1" in
 	forcereload
 	;;
   status)
-	status tgt
+	status tgtd
 	/usr/sbin/tgt-admin -s
 	RETVAL=$?
 	;;
