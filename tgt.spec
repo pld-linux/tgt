@@ -69,7 +69,7 @@ sed -i -e 's#-O2#$(OPTFLAGS)#g' usr/Makefile
 %install
 rm -rf $RPM_BUILD_ROOT
 
-install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
+install -d $RPM_BUILD_ROOT/etc/{rc.d/init.d,tgt}
 install -d $RPM_BUILD_ROOT{%{_docdir}/%{name},%{_mandir}/man8}
 
 %{__make} -C usr install \
@@ -78,6 +78,7 @@ install -d $RPM_BUILD_ROOT{%{_docdir}/%{name},%{_mandir}/man8}
 
 install %{SOURCE1}		$RPM_BUILD_ROOT/etc/rc.d/init.d/tgt
 install doc/manpages/*.8	$RPM_BUILD_ROOT%{_mandir}/man8
+install doc/targets.conf.example	$RPM_BUILD_ROOT/etc/tgt/targets.conf
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -97,3 +98,5 @@ fi
 %attr(755,root,root) %{_sbindir}/tgt*
 %{_mandir}/man8/*
 %attr(754,root,root) /etc/rc.d/init.d/tgt
+%attr(750, root, root) %dir %{_sysconfdir}/tgt
+%attr(750, root, root) %config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/tgt/*.conf
