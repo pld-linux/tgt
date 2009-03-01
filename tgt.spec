@@ -10,6 +10,7 @@ License:	GPL
 Group:		Networking/Daemons
 Source0:	http://stgt.berlios.de/releases/%{name}-%{version}.tar.bz2
 # Source0-md5:	efe76fadd42c4090761be00747c49522
+Source1:	%{name}.init
 URL:		http://stgt.berlios.de/
 BuildRequires:	librdmacm-devel
 BuildRequires:	openssl-devel
@@ -65,19 +66,31 @@ sed -i -e 's#-O2#$(OPTFLAGS)#g' usr/Makefile
 %install
 rm -rf $RPM_BUILD_ROOT
 
+install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -d $RPM_BUILD_ROOT{%{_docdir}/%{name},%{_mandir}/man8}
 
 %{__make} -C usr install \
 	DESTDIR=$RPM_BUILD_ROOT \
 	docdir=$RPM_BUILD_ROOT%{_docdir}/%{name}
 
-install doc/manpages/*.8 $RPM_BUILD_ROOT%{_mandir}/man8
+install %{SOURCE1}		$RPM_BUILD_ROOT/etc/rc.d/init.d/tgt
+install doc/manpages/*.8	$RPM_BUILD_ROOT%{_mandir}/man8
 
 %clean
 rm -rf $RPM_BUILD_ROOT
+
+%post
+/sbin/chkconfig --add tgt
+
+%preun
+if [ "$1" = "0" ]; then
+        %service tgt stop
+        /sbin/chkconfig --del tgt
+fi
 
 %files
 %defattr(644,root,root,755)
 %doc doc/*.*
 %attr(755,root,root) %{_sbindir}/tgt*
 %{_mandir}/man8/*
+%attr(754,root,root) /etc/rc.d/init.d/tgt
