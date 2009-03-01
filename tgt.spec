@@ -2,6 +2,8 @@
 # - init scripts
 # - config files
 %bcond_with	kernel
+#
+%include	/usr/lib/rpm/macros.perl
 Summary:	Linux SCSI target framework
 Name:		tgt
 Version:	0.9.4
@@ -14,6 +16,7 @@ Source1:	%{name}.init
 URL:		http://stgt.berlios.de/
 BuildRequires:	librdmacm-devel
 BuildRequires:	openssl-devel
+BuildRequires:	rpm-perlprov >= 4.1-13
 BuildRequires:	rpmbuild(macros) >= 1.379
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
