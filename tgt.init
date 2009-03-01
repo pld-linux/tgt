@@ -1,0 +1,179 @@
+#!/bin/sh
+#
+# tgt	ISCSI Target Daemon
+#
+# chkconfig:	345 11 89
+#
+# description:	tgt ISCI Target Daemon
+#
+# processname:	tgtd
+# config: /etc/tgt/targets.conf
+#
+
+# Source function library
+. /etc/rc.d/init.d/functions
+
+# Get network config
+. /etc/sysconfig/network
+
+# Get service config - may override defaults
+[ -f /etc/sysconfig/tgt ] && . /etc/sysconfig/tgt
+
+# Check that networking is up.
+if is_yes "${NETWORKING}"; then
+	if [ ! -f /var/lock/subsys/network -a "$1" != stop -a "$1" != status ]; then
+		msg_network_down tgt
+		exit 1
+	fi
+else
+	exit 0
+fi
+
+start() {
+	# Check if the service is already running?
+	if [ -f /var/lock/subsys/tgt ]; then
+		msg_already_running tgt
+		return
+	fi
+
+	msg_starting "iSCSI TGT"
+	daemon /usr/sbin/tgt
+	RETVAL=$?
+	[ $RETVAL -ne 0 ] && return $RETVAL
+
+	# Put tgtd into "offline" state until all the targets are configured.
+	# We don't want initiators to (re)connect and fail the connection
+	# if it's not ready.
+	msg_starting "iSCSI TGT: Entering Offline Mode"
+	daemon /usr/sbin/tgtadm --op update --mode sys --name State -v offline
+
+	msg_starting "iSCSI TGT: Configuring targets"
+	daemon /usr/bin/tgt-admin -e -c /etc/tgt/targets.conf
+
+	msg_starting "iSCSI TGT: Entering Ready Mode"
+	daemon /usr/sbin/tgtadm --op update --mode sys --name State -v ready
+
+	touch /var/lock/subsys/tgt
+	return $RETVAL
+}
+
+forcedstop() {
+	# NOTE: Forced shutdown of the iscsi target may cause data corruption
+	# for initiators that are connected.
+	msg_stopping "iSCSI TGT: Forcing Offline Mode"
+	# Offline everything first. May be needed if we're rebooting, but
+	# expect the initiators to reconnect cleanly when we boot again
+	# (i.e. we don't want them to reconnect to a tgtd which is still
+	# working, but the target is gone).
+	daemon /usr/sbin/tgtadm --op update --mode sys --name State -v offline
+	RETVAL=$?
+	if [ "$RETVAL" -ne 107 ] ; then
+	    msg_stopping "iSCSI TGT: Setting Targets Offline"
+	    daemon /usr/sbin/tgt-admin --offline ALL
+	    msg_stopping "iSCSI TGT: Setting Used Targets Offline"
+	    # Remove all targets, even if they are still in use.
+	    daemon /usr/sbin/tgt-admin --update ALL -c /dev/null -f
+	    # It will shut down tgtd only after all targets were removed.
+	    msg_stopping "iSCSI TGT"
+	    daemon /usr/sbin/tgtadm --op delete --mode system
+	    RETVAL=$?
+	    rm -f /var/lock/subsys/tgt
+	fi
+	
+}
+
+stop() {
+	if [ ! -f /var/lock/subsys/tgt ]; then
+		msg_not_running tgt
+		return
+	fi
+
+	# Stop daemons.
+	if [ "$RUNLEVEL" == 0 -o "$RUNLEVEL" == 6 ] ; then
+	    forcedstop
+	    return
+        fi
+
+	msg_stopping "iSCSI TGT: Setting Targets Offline"
+	# Remove all targets. It only removes targets which are not in use.
+	daemon /usr/sbin/tgt-admin --update ALL -c /dev/null
+	msg_stopping "iSCSI TGT"
+	daemon /usr/sbin/tgtadm --op delete --mode system
+        RETVAL=$?
+        if [ "$RETVAL" -ne 107 -a "$RETVAL" -ne 0 ] ; then
+            echo "Some initiators are still connected - could not stop tgtd"
+        fi
+	rm -f /var/lock/subsys/tgt
+}
+
+reload() {
+	if [ ! -f /var/lock/subsys/tgt ]; then
+		msg_not_running tgt
+		RETVAL=7
+		return
+	fi
+
+	msg_reloading tgt
+	# update only not used targets
+	daemon tgt-admin --update ALL -c /etc/tgt/targets.conf
+	RETVAL=$?
+}
+
+forcereload() {
+	if [ ! -f /var/lock/subsys/tgt ]; then
+		msg_not_running tgt
+		RETVAL=7
+		return
+	fi
+
+	msg_reloading tgt
+	# update all targets, even if in use
+	daemon tgt-admin --update ALL -c /etc/tgt/targets.conf -f
+	RETVAL=$?
+}
+
+
+condrestart() {
+	if [ ! -f /var/lock/subsys/tgt ]; then
+		msg_not_running tgt
+		RETVAL=$1
+		return
+	fi
+
+	stop
+	start
+}
+
+RETVAL=0
+# See how we were called.
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+	stop
+	start
+	;;
+  try-restart)
+	condrestart 0
+	;;
+  reload)
+  	reload
+	;;
+  force-reload)
+	forcereload
+	;;
+  status)
+	status tgt
+	/usr/sbin/tgt-admin -s
+	RETVAL=$?
+	;;
+  *)
+	msg_usage "$0 {start|stop|restart|try-restart|reload|force-reload|status}"
+	exit 3
+esac
+
+exit $RETVAL
