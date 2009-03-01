@@ -48,7 +48,7 @@ start() {
 	daemon /usr/sbin/tgtadm --op update --mode sys --name State -v offline
 
 	msg_starting "iSCSI TGT: Configuring targets"
-	daemon /usr/bin/tgt-admin -e -c /etc/tgt/targets.conf
+	daemon /usr/sbin/tgt-admin -e -c /etc/tgt/targets.conf
 
 	msg_starting "iSCSI TGT: Entering Ready Mode"
 	daemon /usr/sbin/tgtadm --op update --mode sys --name State -v ready
