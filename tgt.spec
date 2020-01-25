@@ -3,7 +3,6 @@
 # - config files
 %bcond_with	kernel
 #
-%include	/usr/lib/rpm/macros.perl
 Summary:	Linux SCSI target framework
 Name:		tgt
 Version:	0.9.4
